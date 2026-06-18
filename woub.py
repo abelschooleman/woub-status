@@ -17,6 +17,7 @@ import core.module
 import core.widget
 import core.decorators
 import requests
+import threading
 from datetime import datetime
 
 
@@ -31,6 +32,7 @@ class Module(core.module.Module):
         self.__end_time = self.parameter("end_time", "18:00")
         self.__count = 0
         self.__error = None
+        self.__lock = threading.Lock()
 
     def __outside_visible_hours(self):
         now = datetime.now()
@@ -58,6 +60,10 @@ class Module(core.module.Module):
         return self.threshold_state(self.__count, 5, 15)
 
     def update(self):
+        thread = threading.Thread(target=self.__fetch, daemon=True)
+        thread.start()
+
+    def __fetch(self):
         try:
             resp = requests.get(
                 "{}/api/v1/chats".format(self.__url.rstrip("/")),
@@ -66,19 +72,25 @@ class Module(core.module.Module):
             )
             resp.raise_for_status()
             chats = resp.json()
-            self.__count = sum(
+            count = sum(
                 chat.get("count_new_messages", 0) for chat in chats
             )
-            self.__error = None
+            with self.__lock:
+                self.__count = count
+                self.__error = None
         except requests.exceptions.HTTPError as e:
-            self.__count = 0
-            self.__error = "woub: {}".format(e.response.status_code)
+            with self.__lock:
+                self.__count = 0
+                self.__error = "woub: {}".format(e.response.status_code)
         except requests.exceptions.ConnectionError:
-            self.__count = 0
-            self.__error = "woub: offline"
+            with self.__lock:
+                self.__count = 0
+                self.__error = "woub: offline"
         except requests.exceptions.Timeout:
-            self.__count = 0
-            self.__error = "woub: timeout"
+            with self.__lock:
+                self.__count = 0
+                self.__error = "woub: timeout"
         except Exception as e:
-            self.__count = 0
-            self.__error = "woub: {}".format(type(e).__name__)
+            with self.__lock:
+                self.__count = 0
+                self.__error = "woub: {}".format(type(e).__name__)
