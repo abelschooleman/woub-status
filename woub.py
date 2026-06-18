@@ -31,6 +31,7 @@ class Module(core.module.Module):
         self.__start_time = self.parameter("start_time", "9:00")
         self.__end_time = self.parameter("end_time", "18:00")
         self.__count = 0
+        self.__prev_count = 0
         self.__error = None
         self.__lock = threading.Lock()
 
@@ -54,6 +55,9 @@ class Module(core.module.Module):
         if self.__error:
             return self.__error
 
+        if self.__count > self.__prev_count:
+            return "● {}".format(self.__count)
+
         return " {}".format(self.__count)
 
     def state(self, widget):
@@ -76,6 +80,7 @@ class Module(core.module.Module):
                 chat.get("count_new_messages", 0) for chat in chats
             )
             with self.__lock:
+                self.__prev_count = self.__count
                 self.__count = count
                 self.__error = None
         except requests.exceptions.HTTPError as e:
