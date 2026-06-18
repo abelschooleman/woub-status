@@ -17,6 +17,7 @@ import core.module
 import core.widget
 import core.decorators
 import requests
+import subprocess
 import threading
 from datetime import datetime
 
@@ -28,6 +29,7 @@ class Module(core.module.Module):
 
         self.__url = self.parameter("url", "")
         self.__api_key = self.parameter("api_key", "")
+        self.__bar_id = self.parameter("bar_id", "main")
         self.__start_time = self.parameter("start_time", "9:00")
         self.__end_time = self.parameter("end_time", "18:00")
         self.__count = 0
@@ -56,12 +58,23 @@ class Module(core.module.Module):
             return self.__error
 
         if self.__count > self.__prev_count:
+            self.__show_bar()
             return "● {}".format(self.__count)
 
         return " {}".format(self.__count)
 
     def state(self, widget):
         return self.threshold_state(self.__count, 5, 15)
+
+    def __show_bar(self):
+        try:
+            subprocess.Popen(
+                ["i3-msg", "bar", self.__bar_id, "show"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except Exception:
+            pass
 
     def update(self):
         thread = threading.Thread(target=self.__fetch, daemon=True)
